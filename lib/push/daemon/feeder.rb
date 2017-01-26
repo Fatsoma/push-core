@@ -4,6 +4,9 @@ module Push
       extend DatabaseReconnectable
       extend InterruptibleSleep
 
+      # The number of messages to batch at the same time
+      BATCH_SIZE = 1000
+
       def self.name
         "Feeder"
       end
@@ -29,8 +32,11 @@ module Push
         begin
           with_database_reconnect_and_retry(name) do
             ready_apps = Push::Daemon::App.ready
-            Push::Message.ready_for_delivery.find_each do |notification|
-              Push::Daemon::App.deliver(notification) if ready_apps.include?(notification.app)
+            push_message_ids = Push::Message.ready_for_delivery.pluck(:id)
+            push_message_ids.in_groups_of(BATCH_SIZE, false) do |ids|
+              Push::Message.where(id: ids).each do |push_message|
+                Push::Daemon::App.deliver(push_message) if ready_apps.include?(push_message.app)
+              end
             end
           end
         rescue StandardError => e
