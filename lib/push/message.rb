@@ -11,7 +11,7 @@ module Push
     validates :device, presence: true
 
     scope :ready_for_delivery, -> {
-      where('delivered = ? AND failed = ? )', false, false)
+      where('delivered = ? AND failed = ?', false, false)
     }
 
     def deliver(connection)
